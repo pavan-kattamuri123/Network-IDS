@@ -5,22 +5,22 @@
   {% set safe_data = data | default([], true) %}
   {% set total_alerts = namespace(value=0) %}
   {% for _label, _count in safe_data %}
-    {% set total_alerts.value = total_alerts.value + (_count | int) %}
+  {% set total_alerts.value = total_alerts.value + (_count | int) %}
   {% endfor %}
 
   <header class="dashboard-header">
     <div>
-      <h1><i class="fas fa-chart-pie"></i> Threat Distribution</h1>
-      <p class="muted">Real-time visualization of detected network activities.</p>
+      <h1><i class="fas fa-microchip"></i> Analytics Dashboard</h1>
+      <p class="muted">Intelligent classification of network traffic patterns.</p>
     </div>
     <div class="dashboard-stats">
       <div class="stat">
         <div class="stat-value">{{ total_alerts.value }}</div>
-        <div class="stat-label">Total Alerts</div>
+        <div class="stat-label">Total Traffic</div>
       </div>
       <div class="stat">
         <div class="stat-value">{{ safe_data | length }}</div>
-        <div class="stat-label">Unique Types</div>
+        <div class="stat-label">Unique Threats</div>
       </div>
     </div>
   </header>
@@ -35,26 +35,31 @@
     <div class="card chart-card">
       <div class="chart-container">
         <canvas id="attackChart" role="img" aria-label="Threat distribution chart"></canvas>
-        <div class="no-data" id="chartPlaceholder" {% if safe_data %}style="display:none"{% endif %}>
-          <i class="fas fa-exclamation-circle fa-2x"></i>
-          <p>No chart data yet. Upload a capture to visualize threats.</p>
+        <div class="no-data" id="chartPlaceholder" {% if safe_data %}style="display:none" {% endif %}>
+          <i class="fas fa-meteor fa-3x" style="color: var(--primary); margin-bottom: 20px; opacity: 0.5;"></i>
+          <p>No analytics data available yet.</p>
+          <a href="/upload" class="button" style="margin-top: 20px;">Upload Capture</a>
         </div>
       </div>
     </div>
 
     <aside class="card info-card">
-      <h3>Top Detected Threats</h3>
+      <h3><i class="fas fa-list-ol"></i> Threat Analysis</h3>
       {% if safe_data %}
       <ul class="top-list">
         {% for label, count in safe_data %}
-        <li><span class="bullet"></span><strong>{{ label }}</strong><span class="count">{{ count }}</span></li>
+        <li>
+          <span><i class="fas fa-circle-nodes" style="color: var(--primary); margin-right: 10px;"></i><strong>{{ label
+              }}</strong></span>
+          <span class="count">{{ count }}</span>
+        </li>
         {% endfor %}
       </ul>
       {% else %}
       <p class="muted">No threats recorded yet — check the <a href="/upload">Upload</a> page to add files.</p>
       {% endif %}
-      <hr>
-      <a class="button" href="/history">View History</a>
+      <hr class="nav-divider" style="margin: 20px 0;">
+      <a class="button" href="/history" style="width: 100%; text-align: center;">Full History Logs</a>
     </aside>
   </div>
 </section>

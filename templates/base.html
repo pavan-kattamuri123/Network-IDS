@@ -9,7 +9,7 @@
     <link rel="icon" href="data:,"> <!-- Fix for favicon 404 -->
     <!-- External Assets -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
 </head>
 
 <body>
@@ -22,10 +22,10 @@
                 <i class="fas fa-shield-virus"></i> SafeNet IDS
             </div>
             <nav>
-                <a href="/"><i class="fas fa-home"></i> Home</a>
-                <a href="/upload"><i class="fas fa-upload"></i> Upload</a>
-                <a href="/dashboard"><i class="fas fa-chart-line"></i> Dashboard</a>
-                <a href="/history"><i class="fas fa-history"></i> History</a>
+                <a href="/" id="nav-home"><i class="fas fa-house-user"></i> Home</a>
+                <a href="/upload" id="nav-upload"><i class="fas fa-cloud-arrow-up"></i> Upload</a>
+                <a href="/dashboard" id="nav-dashboard"><i class="fas fa-chart-line"></i> Dashboard</a>
+                <a href="/history" id="nav-history"><i class="fas fa-clock-rotate-left"></i> History</a>
             </nav>
         </header>
         <hr class="nav-divider">
@@ -33,6 +33,20 @@
             {% block content %}{% endblock %}
         </main>
     </div>
+
+    <script>
+        // Simple active link highlighter
+        const currentPath = window.location.pathname;
+        const navLinks = {
+            '/': 'nav-home',
+            '/upload': 'nav-upload',
+            '/dashboard': 'nav-dashboard',
+            '/history': 'nav-history'
+        };
+        if (navLinks[currentPath]) {
+            document.getElementById(navLinks[currentPath]).classList.add('active');
+        }
+    </script>
 </body>
 
 </html>
