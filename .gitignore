@@ -1,17 +1,1 @@
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-env/
-venv/
-.venv/
-build/
-dist/
-*.egg-info/
 .env
-models/
-uploads/
-temp_test.csv
-test_predict.py
-upload_model.py
