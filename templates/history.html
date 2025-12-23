@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="history-title">
+    <h2><i class="fas fa-history"></i> Detection History</h2>
+</div>
+
+<div class="history-table-container">
+    <table class="history-table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Detected Attack & Summary</th>
+                <th>Timestamp</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+            <tr>
+                <td class="id-cell" title="{{ row[0] }}">{{ row[0] }}</td>
+                <td class="attack-cell">
+                    {% if 'ALERT' in row[1] %}
+                        <span class="alert-text">{{ row[1] }}</span>
+                    {% elif 'BENIGN' in row[1] %}
+                        <span class="benign-text">{{ row[1] }}</span>
+                    {% else %}
+                        {{ row[1] }}
+                    {% endif %}
+                </td>
+                <td class="timestamp-cell">
+                    <i class="far fa-clock"></i> {{ row[2] }}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if not rows %}
+<div class="no-data" style="margin-top: 50px;">
+    <i class="fas fa-folder-open fa-3x"></i>
+    <p>No detection history found.</p>
+</div>
+{% endif %}
+{% endblock %}

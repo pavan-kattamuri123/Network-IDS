@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Upload Network Log</h2>
+<p>Upload a CSV file containing network flow data (CICIDS 2017 format).</p>
+
+{% if error %}
+<div style="background-color: #ffdddd; color: #a94442; padding: 10px; border: 1px solid #ebccd1; margin-bottom: 15px;">
+    {{ error }}
+</div>
+{% endif %}
+
+<form method="post" enctype="multipart/form-data">
+    <input type="file" name="file" accept=".csv" required>
+    <br><br>
+    <button type="submit">Analyze Traffic</button>
+</form>
+{% endblock %}

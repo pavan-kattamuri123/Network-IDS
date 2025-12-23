@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<section class="dashboard">
+  {% set safe_data = data | default([], true) %}
+  {% set total_alerts = namespace(value=0) %}
+  {% for _label, _count in safe_data %}
+    {% set total_alerts.value = total_alerts.value + (_count | int) %}
+  {% endfor %}
+
+  <header class="dashboard-header">
+    <div>
+      <h1><i class="fas fa-chart-pie"></i> Threat Distribution</h1>
+      <p class="muted">Real-time visualization of detected network activities.</p>
+    </div>
+    <div class="dashboard-stats">
+      <div class="stat">
+        <div class="stat-value">{{ total_alerts.value }}</div>
+        <div class="stat-label">Total Alerts</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">{{ safe_data | length }}</div>
+        <div class="stat-label">Unique Types</div>
+      </div>
+    </div>
+  </header>
+
+  <script>
+    // Always define these so `static/js/charts.js` never throws ReferenceError.
+    const labels = JSON.parse('{{ labels | default([], true) | tojson }}');
+    const counts = JSON.parse('{{ counts | default([], true) | tojson }}');
+  </script>
+
+  <div class="dashboard-grid">
+    <div class="card chart-card">
+      <div class="chart-container">
+        <canvas id="attackChart" role="img" aria-label="Threat distribution chart"></canvas>
+        <div class="no-data" id="chartPlaceholder" {% if safe_data %}style="display:none"{% endif %}>
+          <i class="fas fa-exclamation-circle fa-2x"></i>
+          <p>No chart data yet. Upload a capture to visualize threats.</p>
+        </div>
+      </div>
+    </div>
+
+    <aside class="card info-card">
+      <h3>Top Detected Threats</h3>
+      {% if safe_data %}
+      <ul class="top-list">
+        {% for label, count in safe_data %}
+        <li><span class="bullet"></span><strong>{{ label }}</strong><span class="count">{{ count }}</span></li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="muted">No threats recorded yet — check the <a href="/upload">Upload</a> page to add files.</p>
+      {% endif %}
+      <hr>
+      <a class="button" href="/history">View History</a>
+    </aside>
+  </div>
+</section>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+
+{% endblock %}
