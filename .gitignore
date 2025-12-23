@@ -1,4 +1,10 @@
 .env
 uploads/
+dataset/
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.vscode/
+.idea/
+large_files.txt
