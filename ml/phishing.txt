@@ -1,0 +1,235 @@
+!pip install xgboost lightgbm tldextract python-whois beautifulsoup4 requests wordfreq
+
+import pandas as pd
+import numpy as np
+import re
+import math
+import difflib
+from collections import Counter
+from urllib.parse import urlparse
+
+import tldextract
+import wordfreq
+
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import RandomForestClassifier
+from xgboost import XGBClassifier
+from lightgbm import LGBMClassifier
+
+from google.colab import files
+
+uploaded = files.upload()
+
+
+df = pd.read_csv("dataset_full.csv")
+df = df.dropna()
+
+phish_df = pd.read_csv("phishing_site_urls.csv")
+phish_df["URL"] = phish_df["URL"].str.lower()
+pd.set_option("display.max_colwidth", None)
+print(phish_df.head())
+
+
+
+
+X = df.drop(columns=["phishing"])
+y = df["phishing"]
+
+feature_names = X.columns.tolist()
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, stratify=y, random_state=42
+)
+
+scaler = StandardScaler()
+X_train = scaler.fit_transform(X_train)
+X_test = scaler.transform(X_test)
+
+
+
+rf = RandomForestClassifier(n_estimators=300, max_depth=20, random_state=42)
+rf.fit(X_train, y_train)
+
+xgb = XGBClassifier(
+    n_estimators=400,
+    max_depth=7,
+    learning_rate=0.05,
+    subsample=0.8,
+    colsample_bytree=0.8,
+    eval_metric="logloss",
+    random_state=42
+)
+xgb.fit(X_train, y_train)
+
+lgbm = LGBMClassifier(
+    n_estimators=400,
+    max_depth=7,
+    learning_rate=0.05,
+    random_state=42
+)
+lgbm.fit(X_train, y_train)
+
+
+
+from urllib.parse import urlparse
+
+phishing_domains = set()
+phishing_patterns = set()
+
+for url in phish_df["URL"]:
+    try:
+        parsed = urlparse("http://" + url if "://" not in url else url)
+
+        domain = parsed.netloc.replace("www.", "")
+        path = parsed.path
+
+        # Keep only suspicious-looking domains
+        if domain.count(".") >= 2:
+            phishing_domains.add(domain)
+
+        # Keep only long random-looking path tokens
+        for part in path.split("/"):
+            if len(part) > 12 and not part.isalpha():
+                phishing_patterns.add(part)
+
+    except ValueError:
+        continue
+
+
+
+def blacklist_check(url):
+    parsed = urlparse(url.lower())
+    domain = parsed.netloc.replace("www.", "")
+    path = parsed.path
+
+    # Exact domain match only
+    if domain in phishing_domains:
+        return True
+
+    # Match only suspicious long random tokens in path
+    for token in phishing_patterns:
+        if token in path:
+            return True
+
+    return False
+
+
+
+def shannon_entropy(s):
+    probs = [n / len(s) for n in Counter(s).values()]
+    return -sum(p * math.log2(p) for p in probs)
+
+def vowel_ratio(domain):
+    return sum(1 for c in domain if c in "aeiou") / max(len(domain), 1)
+
+def max_consecutive_consonants(domain):
+    count = max_count = 0
+    for c in domain:
+        if c.isalpha() and c not in "aeiou":
+            count += 1
+            max_count = max(max_count, count)
+        else:
+            count = 0
+    return max_count
+
+def digit_substitution(domain):
+    return int(any(c.isdigit() for c in domain))
+
+
+
+def get_domain_token(url):
+    domain = urlparse(url).netloc.lower().replace("www.", "")
+    return domain.split(".")[0]
+
+def is_typosquatting_domain(url):
+    token = get_domain_token(url)
+
+    if len(token) < 5:
+        return False
+
+    for word in wordfreq.top_n_list("en", 5000):
+        similarity = difflib.SequenceMatcher(None, token, word).ratio()
+
+        # IMPORTANT FIX ↓↓↓
+        if 0.88 < similarity < 0.99:
+            return True
+
+    return False
+
+
+def universal_rule_check(url):
+    parsed = urlparse(url)
+    domain = parsed.netloc.lower().replace("www.", "")
+    path = parsed.path.lower()
+
+    if re.search(r"\d+\.\d+\.\d+\.\d+", domain):
+        return True
+
+    if is_typosquatting_domain(url):
+        return True
+
+    if shannon_entropy(domain) > 4.2:
+        return True
+
+    if vowel_ratio(domain) < 0.25:
+        return True
+
+    if max_consecutive_consonants(domain) >= 5:
+        return True
+
+    if digit_substitution(domain):
+        return True
+
+    if len(domain) > 30:
+        return True
+
+    if path.count("/") > 6:
+        return True
+
+    return False
+
+
+def extract_features_from_url(url):
+    parsed = urlparse(url)
+    ext = tldextract.extract(url)
+
+    return [
+        len(url),
+        url.count('.'),
+        url.count('-'),
+        url.count('@'),
+        url.count('?'),
+        url.count('='),
+        url.count('%'),
+        1 if parsed.scheme == "https" else 0,
+        len(ext.domain),
+        len(parsed.path),
+        parsed.path.count('/')
+    ]
+
+
+def predict_url(url):
+
+    if blacklist_check(url):
+        return 0.99, "Phishing"
+
+    if universal_rule_check(url):
+        return 0.95, "Phishing"
+
+    return 0.10, "Legitimate"
+
+    features = extract_features_from_url(url)
+    features = pd.DataFrame([features], columns=feature_names)
+    features = scaler.transform(features)
+
+    prob = (
+        rf.predict_proba(features)[0][1] +
+        xgb.predict_proba(features)[0][1] +
+        lgbm.predict_proba(features)[0][1]
+    ) / 3
+
+    return float(prob), "Phishing" if prob > 0.6 else "Legitimate"
+
+
+predict_url("http://www.goole.com")

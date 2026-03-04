@@ -258,6 +258,32 @@ def upload():
                 
     return render_template("upload.html")
 
+@app.route("/phishing", methods=["GET", "POST"])
+def phishing():
+    result = None
+    if request.method == "POST":
+        url = request.form.get("url", "").strip()
+        if url:
+            try:
+                # Lazy import to avoid circular dependency or slowing down startup
+                from ml.phishing_detector import predict_url
+                prob, verdict, reasons = predict_url(url)
+                result = {
+                    "url": url,
+                    "probability": prob,
+                    "verdict": verdict,
+                    "reasons": reasons
+                }
+            except Exception as e:
+                print(f"Phishing detection error: {e}")
+                result = {
+                    "url": url,
+                    "probability": 0,
+                    "verdict": "Error",
+                    "reasons": [f"System error: {str(e)}"]
+                }
+    return render_template("phishing.html", result=result)
+
 @app.route("/dashboard")
 def dashboard():
     data, labels, counts = _load_dashboard_counts()

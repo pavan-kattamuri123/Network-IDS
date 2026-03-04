@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="monitor-grid">
+    <div class="monitor-card" style="grid-column: span 3;">
+        <div class="card-header">
+            <h3><i class="fas fa-fish"></i> Phishing URL Detector</h3>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="/phishing" class="upload-form">
+                <div class="form-group">
+                    <label for="url_input">Enter URL to scan:</label>
+                    <input type="text" id="url_input" name="url" placeholder="http://example.com" class="form-control"
+                        required
+                        style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.05); color: var(--text-primary);">
+                </div>
+                <button type="submit" class="btn-primary" style="margin-top: 15px;">
+                    <i class="fas fa-search"></i> Scan URL
+                </button>
+            </form>
+
+            {% if result %}
+            <div class="result-box"
+                style="margin-top: 30px; padding: 20px; border-radius: 12px; background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border);">
+                <h4 style="margin-bottom: 15px;">Scan Result:</h4>
+                <div class="verdict"
+                    style="font-size: 1.5rem; font-weight: 700; color: {% if result.verdict == 'Phishing' %}#ff4757{% else %}#2ed573{% endif %};">
+                    <i
+                        class="fas {% if result.verdict == 'Phishing' %}fa-exclamation-triangle{% else %}fa-check-circle{% endif %}"></i>
+                    {{ result.verdict }}
+                </div>
+                <p>Confidence: {{ "%.2f"|format(result.probability * 100) }}%</p>
+
+                {% if result.reasons %}
+                <div class="reasons" style="margin-top: 10px;">
+                    <strong>Detection Reasons:</strong>
+                    <ul>
+                        {% for reason in result.reasons %}
+                        <li>{{ reason }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
