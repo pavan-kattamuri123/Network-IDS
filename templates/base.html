@@ -25,10 +25,9 @@
             </div>
             <nav>
                 <a href="/" id="nav-home"><i class="fas fa-house-user"></i> Home</a>
-                <a href="/upload" id="nav-upload"><i class="fas fa-cloud-arrow-up"></i> Upload</a>
                 <a href="/phishing" id="nav-phishing"><i class="fas fa-fish"></i> Phishing Check</a>
                 <a href="/dashboard" id="nav-dashboard"><i class="fas fa-chart-line"></i> Dashboard</a>
-                <a href="/history" id="nav-history"><i class="fas fa-clock-rotate-left"></i> History</a>
+                <a href="/live" id="nav-live"><i class="fas fa-tower-broadcast"></i> Live Monitor</a>
             </nav>
         </header>
         <hr class="nav-divider">
@@ -42,10 +41,9 @@
         const currentPath = window.location.pathname;
         const navLinks = {
             '/': 'nav-home',
-            '/upload': 'nav-upload',
             '/phishing': 'nav-phishing',
             '/dashboard': 'nav-dashboard',
-            '/history': 'nav-history'
+            '/live': 'nav-live'
         };
         if (navLinks[currentPath]) {
             document.getElementById(navLinks[currentPath]).classList.add('active');

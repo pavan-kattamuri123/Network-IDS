@@ -15,6 +15,10 @@ MODELS_DIR = os.path.join(os.path.dirname(__file__), "models")
 MODELS_LOADED = False
 rf, xgb, lgbm, scaler, feature_names = None, None, None, None, None
 
+# --- Pre-cache Dictionary for O(1) Operations ---
+TOP_WORDS_LIST = wordfreq.top_n_list("en", 5000)
+TOP_WORDS_SET = set(TOP_WORDS_LIST)
+
 def load_models():
     global rf, xgb, lgbm, scaler, feature_names, MODELS_LOADED
     try:
@@ -66,7 +70,16 @@ def is_typosquatting_domain(url):
     if len(token) < 5:
         return False
 
-    for word in wordfreq.top_n_list("en", 5000):
+    # O(1) Exact Match Check
+    if token in TOP_WORDS_SET:
+        return False
+
+    # Optimize: Only compute SequenceMatcher for words of similar length
+    token_len = len(token)
+    for word in TOP_WORDS_LIST:
+        if abs(len(word) - token_len) > 2:
+            continue
+            
         similarity = difflib.SequenceMatcher(None, token, word).ratio()
         if 0.88 < similarity < 0.99:
             return True
@@ -143,7 +156,7 @@ def predict_url(url):
     """
     # 1. Normalize
     if not url.startswith("http"):
-        url = "http://" + url
+        url = "https://" + url
         
     # 2. Rule-based Checks
     is_sus, reasons = universal_rule_check(url)
@@ -164,8 +177,12 @@ def predict_url(url):
             
             avg_prob = (p_rf + p_xgb + p_lgbm) / 3
             
-            verdict = "Phishing" if avg_prob > 0.6 else "Legitimate"
+            verdict = "Phishing" if avg_prob > 0.70 else "Legitimate"
             reason = [f"ML Model Confidence: {avg_prob:.2%}"] if verdict == "Phishing" else ["Safe"]
+            
+            if verdict == "Legitimate" and url.startswith("http://"):
+                verdict = "Suspicious"
+                reason = ["Connection is unsecure (HTTP instead of HTTPS)"]
             
             return float(avg_prob), verdict, reason
             
@@ -174,4 +191,6 @@ def predict_url(url):
             return 0.0, "Error", [str(e)]
     
     # 4. Fallback if no ML and no rules triggered
+    if url.startswith("http://"):
+        return 0.3, "Suspicious", ["Passed heuristics, but connection is unsecure (HTTP)"]
     return 0.1, "Legitimate", ["Passed heuristic checks (ML models not loaded)"]

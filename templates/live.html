@@ -1,0 +1,304 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<section class="live-section">
+    <header class="dashboard-header" style="margin-bottom: 30px;">
+        <div>
+            <h1><i class="fas fa-tower-broadcast"></i> Live Monitor</h1>
+            <p class="muted">Real-time packet capture &amp; intrusion detection on your network.</p>
+        </div>
+        <div class="live-status-wrap">
+            <div class="live-badge" id="liveBadge">
+                <span class="live-dot" id="liveDot"></span>
+                <span id="liveStatusText">Idle</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Controls -->
+    <div class="card live-controls">
+        <div class="controls-row">
+            <div class="iface-group">
+                <label for="ifaceSelect"><i class="fas fa-network-wired"></i> Interface</label>
+                <div class="custom-select-wrap" id="customSelectWrap">
+                    <div class="custom-select-trigger" id="customSelectTrigger" onclick="toggleDropdown()">
+                        <span id="customSelectLabel">Loading interfaces…</span>
+                        <i class="fas fa-chevron-down caret"></i>
+                    </div>
+                    <div class="custom-select-dropdown" id="customSelectDropdown"></div>
+                </div>
+                <input type="hidden" id="ifaceSelect" value="">
+            </div>
+            <div class="btn-group">
+                <button id="btnStart" class="button btn-start" onclick="startCapture()">
+                    <i class="fas fa-play"></i> Start Capture
+                </button>
+                <button id="btnStop" class="button btn-stop" onclick="stopCapture()" disabled>
+                    <i class="fas fa-stop"></i> Stop
+                </button>
+                <button class="button btn-clear" onclick="clearFeed()">
+                    <i class="fas fa-trash-can"></i> Clear
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Bar -->
+    <div class="live-stats">
+        <div class="live-stat-card">
+            <div class="live-stat-icon"><i class="fas fa-wave-square"></i></div>
+            <div>
+                <div class="live-stat-value" id="statTotal">0</div>
+                <div class="live-stat-label">Packets Captured</div>
+            </div>
+        </div>
+        <div class="live-stat-card threat">
+            <div class="live-stat-icon"><i class="fas fa-triangle-exclamation"></i></div>
+            <div>
+                <div class="live-stat-value" id="statThreats">0</div>
+                <div class="live-stat-label">Threats Detected</div>
+            </div>
+        </div>
+        <div class="live-stat-card benign">
+            <div class="live-stat-icon"><i class="fas fa-shield-check"></i></div>
+            <div>
+                <div class="live-stat-value" id="statBenign">0</div>
+                <div class="live-stat-label">Benign Traffic</div>
+            </div>
+        </div>
+        <div class="live-stat-card rate">
+            <div class="live-stat-icon"><i class="fas fa-gauge-high"></i></div>
+            <div>
+                <div class="live-stat-value" id="statRate">0</div>
+                <div class="live-stat-label">Packets/sec</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Packet Feed Table -->
+    <div class="card live-table-card">
+        <div class="live-table-header">
+            <h3><i class="fas fa-terminal"></i> Live Packet Feed</h3>
+            <span class="muted" id="feedCount">0 packets</span>
+        </div>
+        <div class="live-table-wrap" id="packetTableWrap">
+            <table class="live-table" id="packetTable">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Source</th>
+                        <th>Destination</th>
+                        <th>Proto</th>
+                        <th>Size</th>
+                        <th>Confidence</th>
+                        <th>Classification</th>
+                    </tr>
+                </thead>
+                <tbody id="packetFeed">
+                    <!-- rows injected by JS -->
+                </tbody>
+            </table>
+            <div class="no-data" id="noPackets">
+                <i class="fas fa-satellite-dish fa-3x"
+                    style="color: var(--primary); opacity: 0.4; margin-bottom: 16px;"></i>
+                <p>Select an interface and click <strong>Start Capture</strong> to begin monitoring.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Alert Toast Container -->
+<div id="toastContainer"></div>
+
+<!-- Socket.IO -->
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script>
+    const socket = io();
+
+    let totalPkts = 0, threats = 0, benign = 0;
+    let rateCount = 0;
+    const MAX_ROWS = 200;
+    let capturing = false;
+
+    // ── Load interfaces ───────────────────────────────────────────
+    fetch('/api/interfaces')
+        .then(r => r.json())
+        .then(data => {
+            const dropdown = document.getElementById('customSelectDropdown');
+            const label = document.getElementById('customSelectLabel');
+            const hidden = document.getElementById('ifaceSelect');
+            dropdown.innerHTML = '';
+            if (data.interfaces && data.interfaces.length) {
+                data.interfaces.forEach((iface, i) => {
+                    const val = iface.value || iface;
+                    const lbl = iface.label || iface;
+                    const item = document.createElement('div');
+                    item.className = 'custom-select-option' + (i === 0 ? ' selected' : '');
+                    item.textContent = lbl;
+                    item.dataset.value = val;
+                    item.onclick = () => selectIface(val, lbl);
+                    dropdown.appendChild(item);
+                });
+                // Auto-select first
+                const first = data.interfaces[0];
+                hidden.value = first.value || first;
+                label.textContent = first.label || first;
+            } else {
+                label.textContent = 'No interfaces found — run as Admin';
+            }
+        })
+        .catch(() => {
+            document.getElementById('customSelectLabel').textContent = 'Could not load interfaces';
+        });
+
+    function toggleDropdown() {
+        const wrap = document.getElementById('customSelectWrap');
+        wrap.classList.toggle('open');
+    }
+
+    function selectIface(val, lbl) {
+        document.getElementById('ifaceSelect').value = val;
+        document.getElementById('customSelectLabel').textContent = lbl;
+        document.getElementById('customSelectWrap').classList.remove('open');
+        // Mark selected
+        document.querySelectorAll('.custom-select-option').forEach(el => {
+            el.classList.toggle('selected', el.dataset.value === val);
+        });
+    }
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('#customSelectWrap')) {
+            document.getElementById('customSelectWrap').classList.remove('open');
+        }
+    });
+
+    // ── Capture controls ──────────────────────────────────────────
+    function startCapture() {
+        const iface = document.getElementById('ifaceSelect').value;
+        socket.emit('start_capture', { iface: iface || null });
+    }
+
+    function stopCapture() {
+        socket.emit('stop_capture');
+    }
+
+    function clearFeed() {
+        // Clear frontend
+        document.getElementById('packetFeed').innerHTML = '';
+        totalPkts = 0; threats = 0; benign = 0; rateCount = 0;
+        updateStats();
+        document.getElementById('noPackets').style.display = 'flex';
+        document.getElementById('feedCount').textContent = '0 packets';
+
+        // Wipe backend database for privacy
+        fetch('/api/clear_history', { method: 'POST' })
+            .then(r => r.json())
+            .then(res => {
+                if (res.success) {
+                    showErrorToast("History wiped successfully.");
+                }
+            });
+    }
+
+    // ── Socket events ─────────────────────────────────────────────
+    socket.on('capture_status', (data) => {
+        capturing = data.status === 'started';
+        setUI(capturing);
+    });
+
+    socket.on('packet_event', (pkt) => {
+        addPacketRow(pkt);
+        totalPkts++;
+        rateCount++;
+        if ((pkt.label || '').toUpperCase() === 'BENIGN') {
+            benign++;
+        } else {
+            threats++;
+            showToast(pkt);
+        }
+        updateStats();
+        document.getElementById('noPackets').style.display = 'none';
+        document.getElementById('feedCount').textContent = totalPkts + ' packets';
+    });
+
+    socket.on('capture_error', (data) => {
+        showErrorToast(data.message);
+        setUI(false);
+    });
+
+    // ── UI helpers ────────────────────────────────────────────────
+    function setUI(isCapturing) {
+        document.getElementById('btnStart').disabled = isCapturing;
+        document.getElementById('btnStop').disabled = !isCapturing;
+        document.getElementById('liveDot').classList.toggle('capturing', isCapturing);
+        document.getElementById('liveStatusText').textContent = isCapturing ? 'Capturing…' : 'Idle';
+        document.getElementById('liveBadge').classList.toggle('active', isCapturing);
+    }
+
+    function updateStats() {
+        document.getElementById('statTotal').textContent = totalPkts.toLocaleString();
+        document.getElementById('statThreats').textContent = threats.toLocaleString();
+        document.getElementById('statBenign').textContent = benign.toLocaleString();
+    }
+
+    // Packets/sec counter
+    setInterval(() => {
+        document.getElementById('statRate').textContent = rateCount;
+        rateCount = 0;
+    }, 1000);
+
+    function addPacketRow(pkt) {
+        const tbody = document.getElementById('packetFeed');
+        const isThreat = (pkt.label || '').toUpperCase() !== 'BENIGN' && pkt.label !== 'UNKNOWN';
+        const badgeClass = pkt.label === 'UNKNOWN' ? 'badge-unknown' :
+            isThreat ? 'badge-threat' : 'badge-benign';
+
+        const src = pkt.src_port ? `${pkt.src}:${pkt.src_port}` : pkt.src;
+        const dst = pkt.dst_port ? `${pkt.dst}:${pkt.dst_port}` : pkt.dst;
+
+        const tr = document.createElement('tr');
+        if (isThreat) tr.classList.add('row-threat');
+        tr.innerHTML = `
+      <td class="ts">${pkt.timestamp}</td>
+      <td class="ipaddr">${src}</td>
+      <td class="ipaddr">${dst}</td>
+      <td><span class="proto-badge proto-${pkt.proto}">${pkt.proto}</span></td>
+      <td>${pkt.pkt_len}B</td>
+      <td><strong>${pkt.confidence !== undefined ? (pkt.confidence * 100).toFixed(1) + '%' : '—'}</strong></td>
+      <td><span class="badge ${badgeClass}">${isThreat ? '⚠ ' : ''}${pkt.label || '?'}</span></td>
+    `;
+
+        tbody.insertBefore(tr, tbody.firstChild);
+
+        // Trim to MAX_ROWS
+        while (tbody.rows.length > MAX_ROWS) {
+            tbody.deleteRow(tbody.rows.length - 1);
+        }
+    }
+
+    // ── Toast alerts ──────────────────────────────────────────────
+    function showToast(pkt) {
+        const container = document.getElementById('toastContainer');
+        const t = document.createElement('div');
+        t.className = 'toast toast-threat';
+        t.innerHTML = `<i class="fas fa-shield-exclamation"></i>
+      <div><strong>THREAT: ${pkt.label}</strong><br>
+      <span>${pkt.src} → ${pkt.dst}</span></div>
+      <button onclick="this.parentElement.remove()">✕</button>`;
+        container.appendChild(t);
+        setTimeout(() => { if (t.parentElement) t.remove(); }, 6000);
+    }
+
+    function showErrorToast(msg) {
+        const container = document.getElementById('toastContainer');
+        const t = document.createElement('div');
+        t.className = 'toast toast-error';
+        t.innerHTML = `<i class="fas fa-circle-exclamation"></i>
+      <div><strong>Capture Error</strong><br><span>${msg}</span></div>
+      <button onclick="this.parentElement.remove()">✕</button>`;
+        container.appendChild(t);
+        setTimeout(() => { if (t.parentElement) t.remove(); }, 8000);
+    }
+</script>
+{% endblock %}

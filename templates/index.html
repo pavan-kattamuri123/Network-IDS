@@ -1,9 +1,196 @@
 {% extends 'base.html' %}
 {% block content %}
 <div class="hero">
-    <h2>Welcome to the Network IDS</h2>
-    <p>Upload your network traffic log files (CSV) to detect potential intrusions.</p>
-    <br>
-    <a href="/upload" class="button">Start Detection</a>
+    <div class="hero-badge"><i class="fas fa-circle-dot"></i> ML-Powered Detection • Real-Time Analysis</div>
+    <h1>Securing Your Network<br><span class="highlight">In Real-Time</span></h1>
+    <p>SafeNet IDS is a next-generation Intrusion Detection System powered by Machine Learning. Monitor live traffic
+        flows and identify hostile attacks instantly.</p>
+    <div class="hero-actions">
+        <a href="/live" class="button btn-hero-primary"><i class="fas fa-tower-broadcast"></i> Start Live Capture</a>
+        <a href="/dashboard" class="button btn-hero-secondary"><i class="fas fa-chart-line"></i> View Dashboard</a>
+        <a href="/phishing" class="button btn-hero-ghost"><i class="fas fa-shield-alt"></i> Phishing Check</a>
+    </div>
+    <div class="hero-stats">
+        <div class="hero-stat"><span class="hero-stat-val">ML</span><span class="hero-stat-lbl">Powered</span></div>
+        <div class="hero-stat-divider"></div>
+        <div class="hero-stat"><span class="hero-stat-val">Real-Time</span><span class="hero-stat-lbl">Detection</span></div>
+        <div class="hero-stat-divider"></div>
+        <div class="hero-stat"><span class="hero-stat-val">78</span><span class="hero-stat-lbl">Features Analyzed</span></div>
+        <div class="hero-stat-divider"></div>
+        <div class="hero-stat"><span class="hero-stat-val">CIC-IDS</span><span class="hero-stat-lbl">2017 Trained</span></div>
+    </div>
 </div>
+
+<style>
+.hero {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 48px 20px 40px;
+    gap: 0;
+}
+
+.hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(135deg, rgba(255,90,110,0.1), rgba(138,92,255,0.1));
+    border: 1px solid rgba(196,78,191,0.25);
+    border-radius: 30px;
+    padding: 6px 18px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--grad-mid, #C44EBF);
+    letter-spacing: 0.04em;
+    margin-bottom: 24px;
+    text-transform: uppercase;
+}
+
+.hero-badge i {
+    color: var(--grad-start, #FF5A6E);
+    animation: pulse 1.8s infinite;
+}
+
+.hero h1 {
+    font-size: 3rem;
+    line-height: 1.15;
+    margin-bottom: 18px;
+    display: block;
+    -webkit-text-fill-color: unset;
+    background: none;
+    color: var(--text-main, #f0f4ff);
+}
+
+.hero h1 .highlight {
+    background: linear-gradient(90deg, #FF5A6E, #8A5CFF);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    display: inline;
+}
+
+.hero p {
+    max-width: 560px;
+    color: var(--text-muted2, #94a3b8);
+    font-size: 1rem;
+    line-height: 1.7;
+    margin-bottom: 36px;
+}
+
+/* ── Button Row ── */
+.hero-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-bottom: 48px;
+}
+
+.btn-hero-primary {
+    background: linear-gradient(135deg, #FF5A6E, #8A5CFF) !important;
+    box-shadow: 0 6px 24px rgba(196,78,191,0.4) !important;
+    padding: 14px 28px !important;
+    font-size: 0.95rem !important;
+    border-radius: 12px !important;
+    border: none !important;
+    transition: all 0.25s ease !important;
+}
+
+.btn-hero-primary:hover {
+    transform: translateY(-3px) scale(1.03) !important;
+    box-shadow: 0 10px 32px rgba(196,78,191,0.55) !important;
+    filter: brightness(1.08) !important;
+}
+
+.btn-hero-secondary {
+    background: rgba(255,255,255,0.05) !important;
+    border: 1px solid rgba(196,78,191,0.35) !important;
+    color: #fff !important;
+    padding: 13px 26px !important;
+    font-size: 0.9rem !important;
+    border-radius: 12px !important;
+    box-shadow: none !important;
+    transition: all 0.25s ease !important;
+}
+
+.btn-hero-secondary:hover {
+    background: rgba(196,78,191,0.1) !important;
+    border-color: rgba(196,78,191,0.6) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 20px rgba(196,78,191,0.2) !important;
+}
+
+.btn-hero-ghost {
+    background: transparent !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    color: var(--text-muted2, #94a3b8) !important;
+    padding: 13px 22px !important;
+    font-size: 0.88rem !important;
+    border-radius: 12px !important;
+    box-shadow: none !important;
+    transition: all 0.25s ease !important;
+}
+
+.btn-hero-ghost:hover {
+    border-color: rgba(255,255,255,0.25) !important;
+    color: #fff !important;
+    transform: translateY(-2px) !important;
+}
+
+/* ── Stats Strip ── */
+.hero-stats {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 16px;
+    padding: 18px 32px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.hero-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0 28px;
+}
+
+.hero-stat-val {
+    font-size: 1.3rem;
+    font-weight: 800;
+    background: linear-gradient(90deg, #FF5A6E, #8A5CFF);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    line-height: 1.2;
+}
+
+.hero-stat-lbl {
+    font-size: 0.72rem;
+    color: var(--text-muted, #6b7fa3);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 3px;
+}
+
+.hero-stat-divider {
+    width: 1px;
+    height: 36px;
+    background: rgba(255,255,255,0.08);
+    flex-shrink: 0;
+}
+
+@media (max-width: 600px) {
+    .hero h1 { font-size: 2rem; }
+    .hero-actions { flex-direction: column; width: 100%; }
+    .hero-actions .button { width: 100%; justify-content: center; }
+    .hero-stats { gap: 16px; padding: 16px; }
+    .hero-stat-divider { display: none; }
+    .hero-stat { padding: 0 12px; }
+}
+</style>
 {% endblock %}

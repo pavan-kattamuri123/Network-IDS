@@ -3,7 +3,8 @@ import os
 # Prevent creation of __pycache__ and .pyc files
 sys.dont_write_bytecode = True
 
-from flask import Flask, render_template, request, redirect
+from flask import Flask, render_template, request, redirect, jsonify
+from flask_socketio import SocketIO, emit
 from ml.predict import predict_attack
 import json
 from datetime import datetime, timezone
@@ -12,8 +13,11 @@ from functools import lru_cache
 from urllib.parse import urlparse, urlunparse
 
 app = Flask(__name__)
-UPLOAD_FOLDER = 'uploads'
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'safenet-ids-secret')
+socketio = SocketIO(app, async_mode='threading', cors_allowed_origins='*')
+
+# Live capture state (one session at a time)
+_live_capture = None
 
 # Manually load .env if it exists (robust against PowerShell UTF-16/null bytes)
 if os.path.exists(".env"):
@@ -74,8 +78,6 @@ MONGO_TIMEOUT_MS = int(os.environ.get("MONGO_TIMEOUT_MS", "20000"))
 MONGO_STORE_MODE = os.environ.get("MONGO_STORE_MODE", "summary").strip().lower()  # summary|per_row
 HISTORY_LIMIT_DEFAULT = int(os.environ.get("HISTORY_LIMIT", "200"))
 
-# Ensure upload folder exists
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 def _init_history_storage():
     """Verify MongoDB connection availability on startup."""
@@ -110,6 +112,8 @@ def _mongo_collection():
     # Helpful index for fast dashboard + history sorting
     try:
         col.create_index([("timestamp", -1)])
+        # Optimized compound index explicitly for dashboard aggregation Speed $O(1)$
+        col.create_index([("type", 1), ("timestamp", -1)])
     except Exception:
         pass
     return col
@@ -134,44 +138,6 @@ def _append_mongo_summary(attacks, source_file=None):
     }
     col.insert_one(doc)
 
-def _load_history_rows(limit=None):
-    """
-    Return rows as list of tuples: (id, attack, timestamp) sorted newest-first,
-    matching what templates/history.html expects.
-    """
-    limit = HISTORY_LIMIT_DEFAULT if limit is None else int(limit)
-    if limit <= 0:
-        limit = HISTORY_LIMIT_DEFAULT
-
-    col = _mongo_collection()
-    rows = []
-    # In summary mode, history is "one row per upload" (fast + readable).
-    query = {"type": "summary"} if MONGO_STORE_MODE == "summary" else {}
-    cursor = (
-        col.find(query, {"attack": 1, "attack_counts": 1, "total": 1, "source_file": 1, "timestamp": 1})
-        .sort("timestamp", -1)
-        .limit(limit)
-    )
-    for doc in cursor:
-        if doc.get("attack_counts"):
-            # Summary row (one per upload) - Format as readable string
-            counts = doc.get("attack_counts", {})
-            total = doc.get("total", 0)
-            filename = doc.get("source_file", "Unknown")
-            
-            # Find the most frequent attack (excluding Benign if others exist)
-            alerts = {k: v for k, v in counts.items() if k.upper() != "BENIGN"}
-            if alerts:
-                top_attack = max(alerts, key=alerts.get)
-                summary = f"⚠️ Scan Results: {total} rows. ALERT: Most frequent: {top_attack}"
-            else:
-                summary = f"✅ Scan Results: {total} rows. Status: BENIGN"
-                
-            attack_str = summary
-        else:
-            attack_str = doc.get("attack")
-        rows.append((str(doc.get("_id")), attack_str, doc.get("timestamp")))
-    return rows
 
 def _load_dashboard_counts():
     """
@@ -224,39 +190,6 @@ def _store_history_results(results, source_file=None):
 def index():
     return render_template("index.html")
 
-@app.route("/upload", methods=["GET","POST"])
-def upload():
-    if request.method == "POST":
-        if 'file' not in request.files:
-            return redirect(request.url)
-            
-        file = request.files['file']
-        if file.filename == '':
-            return redirect(request.url)
-
-        if file:
-            path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
-            file.save(path)
-
-            try:
-                results = predict_attack(path)
-
-                try:
-                    _store_history_results(results, source_file=file.filename)
-                except Exception as storage_error:
-                    print(f"History storage error: {storage_error}")
-                    hint = (
-                        "Check Atlas Network Access (IP allowlist) and ensure your network allows outbound 27017. "
-                        "You can also increase MONGO_TIMEOUT_MS (e.g. 30000)."
-                    )
-                    return render_template("upload.html", error=f"History Storage Error: {storage_error}\n{hint}")
-
-                return redirect("/dashboard")
-            except Exception as e:
-                print(f"Error during prediction: {e}")
-                return render_template("upload.html", error=f"Prediction Error: {e}")
-                
-    return render_template("upload.html")
 
 @app.route("/phishing", methods=["GET", "POST"])
 def phishing():
@@ -284,17 +217,142 @@ def phishing():
                 }
     return render_template("phishing.html", result=result)
 
+# Example/seed data shown when no real DB data exists yet
+_EXAMPLE_DATA = [
+    ("BENIGN",       15423),
+    ("DoS Hulk",      3210),
+    ("PortScan",       980),
+    ("DDoS",           741),
+    ("DoS GoldenEye",  432),
+    ("FTP-Patator",    201),
+    ("SSH-Patator",    187),
+    ("Bot",             94),
+]
+
+def _load_recent_attacks(limit=10):
+    """Return last `limit` non-benign attack records from MongoDB."""
+    try:
+        col = _mongo_collection()
+        # per-row docs have an "attack" key; summary docs have "attack_counts"
+        cursor = col.find(
+            {"$and": [
+                {"attack": {"$exists": True}},
+                {"attack_counts": {"$exists": False}},
+                {"attack": {"$not": {"$regex": "^BENIGN$", "$options": "i"}}}
+            ]},
+            {"attack": 1, "timestamp": 1, "_id": 0}
+        ).sort("timestamp", -1).limit(limit)
+        results = []
+        for doc in cursor:
+            ts = doc.get("timestamp")
+            ts_str = ts.strftime("%Y-%m-%d %H:%M:%S") if ts else "—"
+            results.append({"attack": doc.get("attack", "?"), "timestamp": ts_str})
+        return results
+    except Exception:
+        return []
+
 @app.route("/dashboard")
 def dashboard():
     data, labels, counts = _load_dashboard_counts()
-    return render_template("dashboard.html", data=data, labels=labels, counts=counts)
 
-@app.route("/history")
-def history():
-    # Allow ?limit=50 (optional). Defaults to HISTORY_LIMIT env var (200).
-    limit = request.args.get("limit", None)
-    rows = _load_history_rows(limit=limit) if limit is not None else _load_history_rows()
-    return render_template("history.html", rows=rows)
+    # If DB is empty, show example/seed data so chart isn't blank
+    using_example = False
+    if not data:
+        data = _EXAMPLE_DATA
+        labels = [d[0] for d in data]
+        counts = [d[1] for d in data]
+        using_example = True
+
+    # Compute benign vs threat totals
+    total = sum(counts)
+    benign_count = 0
+    threats_count = 0
+    for label, count in data:
+        if label.upper() == "BENIGN":
+            benign_count += count
+        else:
+            threats_count += count
+
+    recent_attacks = _load_recent_attacks(limit=10)
+
+    return render_template(
+        "dashboard.html",
+        data=data,
+        labels=labels,
+        counts=counts,
+        using_example=using_example,
+        total=total,
+        benign_count=benign_count,
+        threats_count=threats_count,
+        recent_attacks=recent_attacks,
+    )
+
+
+@app.route("/api/clear_history", methods=["POST"])
+def clear_history():
+    """Wipes all scan history and live capture data from the database."""
+    try:
+        col = _mongo_collection()
+        col.delete_many({})
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+# ─── Live Capture Routes ────────────────────────────────────────────────────
+
+@app.route("/live")
+def live():
+    return render_template("live.html")
+
+
+@app.route("/api/interfaces")
+def api_interfaces():
+    try:
+        from ml.live_capture import get_network_interfaces
+        ifaces = get_network_interfaces()
+    except Exception as e:
+        ifaces = []
+    return jsonify({"interfaces": ifaces})
+
+
+@socketio.on("start_capture")
+def handle_start_capture(data):
+    global _live_capture
+    from ml.live_capture import LiveCaptureThread
+
+    iface = data.get("iface") or None
+
+    if _live_capture and _live_capture.is_running():
+        _live_capture.stop()
+
+    def _on_result(result):
+        if "error" in result:
+            socketio.emit("capture_error", {"message": result["error"]})
+            return
+
+        # Persist non-benign live detections to MongoDB
+        label = result.get("label", "")
+        if label.upper() not in ("BENIGN", "UNKNOWN", ""):
+            try:
+                _append_mongo_summary([label], source_file="[LIVE]")
+            except Exception:
+                pass
+
+        socketio.emit("packet_event", result)
+
+    _live_capture = LiveCaptureThread(on_result=_on_result, iface=iface)
+    _live_capture.start()
+    emit("capture_status", {"status": "started"})
+
+
+@socketio.on("stop_capture")
+def handle_stop_capture():
+    global _live_capture
+    if _live_capture:
+        _live_capture.stop()
+        _live_capture = None
+    emit("capture_status", {"status": "stopped"})
+
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    socketio.run(app, debug=True)
