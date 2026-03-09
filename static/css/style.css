@@ -798,6 +798,20 @@ input[type="file"]:hover {
   display: block;
 }
 
+/* ── Verdict Colors ────────────────────────────────────── */
+.text-phishing {
+  color: #ff4757 !important;
+}
+
+.text-suspicious {
+  color: #fbc531 !important;
+}
+
+.text-secure {
+  color: #2ed573 !important;
+}
+
+
 .custom-select-option {
   padding: 10px 14px;
   font-size: 0.86rem;

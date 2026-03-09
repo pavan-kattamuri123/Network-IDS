@@ -23,10 +23,13 @@
             <div class="result-box"
                 style="margin-top: 30px; padding: 20px; border-radius: 12px; background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border);">
                 <h4 style="margin-bottom: 15px;">Scan Result:</h4>
-                <div class="verdict"
-                    style="font-size: 1.5rem; font-weight: 700; color: {% if result.verdict == 'Phishing' %}#ff4757{% elif result.verdict == 'Suspicious' %}#fbc531{% else %}#2ed573{% endif %};">
-                    <i
-                        class="fas {% if result.verdict == 'Phishing' %}fa-exclamation-triangle{% elif result.verdict == 'Suspicious' %}fa-exclamation-circle{% else %}fa-check-circle{% endif %}"></i>
+                {% set verdict_class = 'text-phishing' if result.verdict == 'Phishing' else ('text-suspicious' if
+                result.verdict ==
+                'Suspicious' else 'text-secure') %}
+                {% set verdict_icon = 'fa-exclamation-triangle' if result.verdict == 'Phishing' else
+                ('fa-exclamation-circle' if result.verdict == 'Suspicious' else 'fa-check-circle') %}
+                <div class="verdict {{ verdict_class }}" style="font-size: 1.5rem; font-weight: 700;">
+                    <i class="fas {{ verdict_icon }}"></i>
                     {{ result.verdict }}
                 </div>
                 <p>Confidence: {{ "%.2f"|format((result.probability or 0) * 100) }}%</p>
