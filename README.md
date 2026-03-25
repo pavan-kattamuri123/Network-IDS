@@ -1,5 +1,7 @@
 # Network-IDS
-A Flask-based Network Intrusion Detection System (NIDS) that uses machine learning to analyze network traffic and identify threats. Features include CSV data uploads, real-time prediction, a visualization dashboard for monitoring attack types, and cloud-integrated history tracking via MongoDB Atlas for comprehensive network security analytics.
+The Network Intrusion Detection System (NIDS) is a cybersecurity-based project designed to monitor network traffic and detect malicious activities or unauthorized access attempts in real time. The system analyzes incoming and outgoing packets using predefined rules and anomaly detection techniques to identify potential threats such as DoS attacks, port scanning, and suspicious login attempts.
+
+The project is developed to enhance network security by providing alerts and logs whenever unusual or harmful behavior is detected. It helps administrators take immediate action to prevent data breaches and system compromise.
 
 
 Network Intrusion Detection System (NIDS):
