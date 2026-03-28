@@ -1188,7 +1188,8 @@ input[type="file"]:hover {
   }
 }
 
-/* ── Responsive ────────────────────────────────────────── */
+/* ── Responsive Mobile & Tablet ──────────────────────────── */
+
 @media (max-width: 900px) {
   .live-stats {
     grid-template-columns: repeat(2, 1fr);
@@ -1206,6 +1207,53 @@ input[type="file"]:hover {
   .monitor-grid {
     grid-template-columns: 1fr;
   }
+
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+
+  /* Make header stack vertically on tablets */
+  header {
+    flex-direction: column;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  /* Make navigation items wrap or scroll */
+  nav {
+    flex-wrap: wrap;
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  nav a {
+    flex: 1;
+    justify-content: center;
+    text-align: center;
+    padding: 10px 8px;
+    font-size: 0.85rem;
+  }
+
+  .container {
+    padding: 24px 20px;
+  }
+
+  /* Make status badge relative instead of fixed so it doesnt overlap header */
+  .status-badge {
+    position: relative;
+    top: auto;
+    right: auto;
+    margin-bottom: 20px;
+    display: inline-flex;
+    width: fit-content;
+  }
+
+  .sidebar-info {
+    text-align: right;
+  }
 }
 
 @media (max-width: 500px) {
@@ -1214,11 +1262,48 @@ input[type="file"]:hover {
   }
 
   .container {
-    padding: 20px 18px;
-    margin: 16px auto;
+    padding: 15px 12px;
+    margin: 10px auto;
+    width: 98%;
+    border-radius: 12px;
   }
 
   .logo {
     font-size: 1.4rem;
+  }
+
+  /* Make typography slightly smaller */
+  h1,
+  .dashboard-header h1 {
+    font-size: 1.5rem;
+  }
+
+  .dashboard-stats {
+    flex-direction: column;
+  }
+
+  /* Table Container Scrolling */
+  .history-table,
+  .live-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .live-table-wrap {
+    padding: 0;
+  }
+
+  .card {
+    padding: 16px;
+  }
+
+  .card-body {
+    padding: 16px;
+  }
+
+  form .btn-primary {
+    width: 100%;
+    justify-content: center;
   }
 }

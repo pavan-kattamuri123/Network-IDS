@@ -28,6 +28,11 @@
                 <a href="/phishing" id="nav-phishing"><i class="fas fa-fish"></i> Phishing Check</a>
                 <a href="/dashboard" id="nav-dashboard"><i class="fas fa-chart-line"></i> Dashboard</a>
                 <a href="/live" id="nav-live"><i class="fas fa-tower-broadcast"></i> Live Monitor</a>
+                {% if session.get('user') %}
+                <a href="/logout" id="nav-logout" style="color: var(--danger);"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                {% else %}
+                <a href="/login" id="nav-login" style="color: #1a73e8;"><i class="fab fa-google"></i> Login</a>
+                {% endif %}
             </nav>
         </header>
         <hr class="nav-divider">
@@ -43,10 +48,12 @@
             '/': 'nav-home',
             '/phishing': 'nav-phishing',
             '/dashboard': 'nav-dashboard',
-            '/live': 'nav-live'
+            '/live': 'nav-live',
+            '/login': 'nav-login'
         };
         if (navLinks[currentPath]) {
-            document.getElementById(navLinks[currentPath]).classList.add('active');
+            const link = document.getElementById(navLinks[currentPath]);
+            if (link) link.classList.add('active');
         }
     </script>
 </body>

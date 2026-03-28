@@ -2,6 +2,13 @@
 {% block content %}
 <div class="hero">
     <div class="hero-badge"><i class="fas fa-circle-dot"></i> ML-Powered Detection • Real-Time Analysis</div>
+    
+    {% if session.get('user') %}
+    <div class="user-greeting" style="margin-top: 10px; margin-bottom: 16px; font-size: 1.65rem; color: var(--text-muted); font-weight: 500;">
+        Hello, <strong style="color: #fff; font-family: 'Outfit', sans-serif;">{{ session['user'].get('given_name', session['user'].get('name', 'there')) }}</strong>! 👋
+    </div>
+    {% endif %}
+
     <h1>Securing Your Network<br><span class="highlight">In Real-Time</span></h1>
     <p>SafeNet IDS is a next-generation Intrusion Detection System powered by Machine Learning. Monitor live traffic
         flows and identify hostile attacks instantly.</p>

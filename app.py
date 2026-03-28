@@ -3,18 +3,37 @@ import os
 # Prevent creation of __pycache__ and .pyc files
 sys.dont_write_bytecode = True
 
-from flask import Flask, render_template, request, redirect, jsonify
+from flask import Flask, render_template, request, redirect, jsonify, session, url_for
 from flask_socketio import SocketIO, emit
 from ml.predict import predict_attack
 import json
 from datetime import datetime, timezone
 from collections import Counter
-from functools import lru_cache
+from functools import lru_cache, wraps
 from urllib.parse import urlparse, urlunparse
+from authlib.integrations.flask_client import OAuth
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'safenet-ids-secret')
 socketio = SocketIO(app, async_mode='threading', cors_allowed_origins='*')
+
+# Google OAuth setup
+oauth = OAuth(app)
+google = oauth.register(
+    name='google',
+    client_id=os.environ.get("GOOGLE_CLIENT_ID", ""),
+    client_secret=os.environ.get("GOOGLE_CLIENT_SECRET", ""),
+    server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
+    client_kwargs={'scope': 'openid email profile'}
+)
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('user'):
+            return redirect(url_for('login_page'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 # Live capture state (one session at a time)
 _live_capture = None
@@ -187,11 +206,40 @@ def _store_history_results(results, source_file=None):
         _append_mongo_summary(results, source_file=source_file)
 
 @app.route("/")
+@login_required
 def index():
     return render_template("index.html")
 
+@app.route("/login")
+def login_page():
+    if session.get('user'):
+        return redirect(url_for('index'))
+    return render_template("login.html")
+
+@app.route('/google/login')
+def google_login():
+    redirect_uri = url_for('authorize', _external=True)
+    return google.authorize_redirect(redirect_uri)
+
+@app.route('/authorize')
+def authorize():
+    try:
+        token = google.authorize_access_token()
+        user_info = token.get('userinfo')
+        if user_info:
+            session['user'] = user_info
+        return redirect(url_for('index'))
+    except Exception as e:
+        print(f"OAuth error: {e}")
+        return redirect(url_for('login_page'))
+
+@app.route('/logout')
+def logout():
+    session.pop('user', None)
+    return redirect(url_for('index'))
 
 @app.route("/phishing", methods=["GET", "POST"])
+@login_required
 def phishing():
     result = None
     if request.method == "POST":
@@ -252,6 +300,7 @@ def _load_recent_attacks(limit=10):
         return []
 
 @app.route("/dashboard")
+@login_required
 def dashboard():
     data, labels, counts = _load_dashboard_counts()
 
@@ -289,6 +338,7 @@ def dashboard():
 
 
 @app.route("/api/clear_history", methods=["POST"])
+@login_required
 def clear_history():
     """Wipes all scan history and live capture data from the database."""
     try:
@@ -301,11 +351,13 @@ def clear_history():
 # ─── Live Capture Routes ────────────────────────────────────────────────────
 
 @app.route("/live")
+@login_required
 def live():
     return render_template("live.html")
 
 
 @app.route("/api/interfaces")
+@login_required
 def api_interfaces():
     try:
         from ml.live_capture import get_network_interfaces
@@ -317,6 +369,9 @@ def api_interfaces():
 
 @socketio.on("start_capture")
 def handle_start_capture(data):
+    if not session.get('user'):
+        emit("capture_error", {"message": "Unauthorized"})
+        return
     global _live_capture
     from ml.live_capture import LiveCaptureThread
 
@@ -347,6 +402,8 @@ def handle_start_capture(data):
 
 @socketio.on("stop_capture")
 def handle_stop_capture():
+    if not session.get('user'):
+        return
     global _live_capture
     if _live_capture:
         _live_capture.stop()
